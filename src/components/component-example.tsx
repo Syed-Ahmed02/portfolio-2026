@@ -70,10 +70,12 @@ import { PlusSignIcon, BluetoothIcon, MoreVerticalCircle01Icon, FileIcon, Folder
 
 export function ComponentExample() {
   return (
-    <ExampleWrapper>
+    <div className="flex flex-col items-center justify-center h-screen bg-background max-w-5xl mx-auto" >
+      <div className="flex max-w-5xl min-w-0" >
       <CardExample />
       <FormExample />
-    </ExampleWrapper>
+      </div>
+    </div>
   )
 }
 
