@@ -9,7 +9,7 @@ export const Route = createFileRoute('/api/chat')({
         const { messages }: { messages: UIMessage[] } = await request.json();
 
         const result = streamText({
-          model: openrouter.chat('tngtech/tng-r1t-chimera:free'),
+          model: openrouter.chat('openai/gpt-4o-mini'),
           messages: await convertToModelMessages(messages),
         });
 
