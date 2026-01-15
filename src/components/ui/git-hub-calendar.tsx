@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { format, subDays, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from "date-fns";
+import { format, subDays, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, getMonth, getYear, startOfMonth, isAfter, isBefore } from "date-fns";
 
 interface ContributionDay {
   date: string; // ISO date string (e.g., "2025-09-13")
@@ -16,9 +16,8 @@ interface GitHubCalendarProps {
 const GitHubCalendar = ({ data, colors = ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"] }: GitHubCalendarProps) => {
   const [contributions, setContributions] = useState<ContributionDay[]>([]);
   const today = new Date();
-  const startDate = subDays(today, 364); // One year back
+  const startDate = subDays(today, 365); // Exactly one year back (365 days)
   const weeks = 53;
-  const daysInWeek = 7;
 
   // Process data prop
   useEffect(() => {
@@ -68,19 +67,86 @@ const GitHubCalendar = ({ data, colors = ["#ebedf0", "#9be9a8", "#40c463", "#30a
     return weeksArray;
   };
 
-  // Render month labels
+  // Render month labels dynamically based on the actual calendar weeks
   const renderMonthLabels = () => {
-    const months = [];
-    let currentMonth = startDate;
-    for (let i = 0; i < 12; i++) {
-      months.push(
-        <span key={i} className="text-xs text-gray-500">
-          {format(currentMonth, "MMM")}
-        </span>
-      );
-      currentMonth = addDays(currentMonth, 30);
+    const monthLabels: Array<{ label: string; weekIndex: number }> = [];
+    const calendarStart = startOfWeek(startDate, { weekStartsOn: 0 });
+    let currentWeekStart = calendarStart;
+    
+    // Track which months we've already labeled
+    const seenMonths = new Set<string>();
+    
+    // Iterate through all weeks to find where months start
+    for (let weekIndex = 0; weekIndex < weeks; weekIndex++) {
+      const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
+      
+      // Check each day of the week to see if it's the first day of a month
+      const weekDays = eachDayOfInterval({
+        start: currentWeekStart,
+        end: weekEnd,
+      });
+      
+      for (const day of weekDays) {
+        // Check if this is the first day of a month
+        if (isSameDay(day, startOfMonth(day))) {
+          const monthKey = `${getYear(day)}-${getMonth(day)}`;
+          
+          // Only add label if we haven't seen this month yet
+          if (!seenMonths.has(monthKey) && 
+              (isAfter(day, startDate) || isSameDay(day, startDate)) &&
+              (isBefore(day, today) || isSameDay(day, today))) {
+            monthLabels.push({
+              label: format(day, "MMM"),
+              weekIndex: weekIndex,
+            });
+            seenMonths.add(monthKey);
+            break; // Only one label per week
+          }
+        }
+      }
+      
+      // Always ensure current month is shown on the last week if not already added
+      if (weekIndex === weeks - 1) {
+        const currentMonthKey = `${getYear(today)}-${getMonth(today)}`;
+        if (!seenMonths.has(currentMonthKey)) {
+          monthLabels.push({
+            label: format(today, "MMM"),
+            weekIndex: weekIndex,
+          });
+          seenMonths.add(currentMonthKey);
+        }
+      }
+      
+      currentWeekStart = addDays(currentWeekStart, 7);
     }
-    return months;
+    
+    // Sort by week index
+    monthLabels.sort((a, b) => a.weekIndex - b.weekIndex);
+    
+    // Render labels positioned at their respective week indices
+    // Each label should align with its corresponding week column
+    // Week columns are w-3 (0.75rem) wide, with gap-1 (0.25rem) between them
+    const labelElements = [];
+    let currentLabelIndex = 0;
+    
+    for (let i = 0; i < weeks; i++) {
+      if (currentLabelIndex < monthLabels.length && monthLabels[currentLabelIndex].weekIndex === i) {
+        // Render the month label - align left within the week column width
+        labelElements.push(
+          <div key={i} className="text-xs text-gray-500 w-3 flex items-start">
+            {monthLabels[currentLabelIndex].label}
+          </div>
+        );
+        currentLabelIndex++;
+      } else {
+        // Add empty placeholder with same width as week column
+        labelElements.push(
+          <div key={i} className="w-3"></div>
+        );
+      }
+    }
+    
+    return labelElements;
   };
 
   // Render day labels
@@ -97,7 +163,7 @@ const GitHubCalendar = ({ data, colors = ["#ebedf0", "#9be9a8", "#40c463", "#30a
           ))}
         </div>
         <div className="pr-2">
-          <div className="flex justify-between gap-4 mb-2 ">{renderMonthLabels()}</div>
+          <div className="flex gap-1 mb-2 ">{renderMonthLabels()}</div>
           <div className="flex gap-1 ">{renderWeeks()}</div>
         </div>
       </div>
