@@ -1,181 +1,517 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { format, subDays, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, getMonth, getYear, startOfMonth, isAfter, isBefore } from "date-fns";
+import type { Day as WeekDay } from "date-fns";
+import {
+  differenceInCalendarDays,
+  eachDayOfInterval,
+  formatISO,
+  getDay,
+  getMonth,
+  getYear,
+  nextDay,
+  parseISO,
+  subWeeks,
+} from "date-fns";
+import {
+  type CSSProperties,
+  createContext,
+  Fragment,
+  type HTMLAttributes,
+  type ReactNode,
+  useContext,
+  useMemo,
+} from "react";
+import { cn } from "@/lib/utils";
 
-interface ContributionDay {
-  date: string; // ISO date string (e.g., "2025-09-13")
+export type Activity = {
+  date: string;
   count: number;
-}
+  level: number;
+};
 
-interface GitHubCalendarProps {
-  data: ContributionDay[]; // Contribution data
-  colors?: string[]; // Custom color scale (default: GitHub-like greens)
-}
+type Week = Array<Activity | undefined>;
 
-const GitHubCalendar = ({ data, colors = ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"] }: GitHubCalendarProps) => {
-  const [contributions, setContributions] = useState<ContributionDay[]>([]);
-  const today = new Date();
-  const startDate = subDays(today, 365); // Exactly one year back (365 days)
-  const weeks = 53;
-
-  // Process data prop
-  useEffect(() => {
-    setContributions(data.map((item) => ({ ...item, date: new Date(item.date).toISOString() })));
-  }, [data]);
-
-  // Get color based on contribution count
-  const getColor = (count: number) => {
-    if (count === 0) return colors[0];
-    if (count === 1) return colors[1];
-    if (count === 2) return colors[2];
-    if (count === 3) return colors[3];
-    return colors[4] || colors[colors.length - 1]; // Fallback to last color
+export type Labels = {
+  months?: string[];
+  weekdays?: string[];
+  totalCount?: string;
+  legend?: {
+    less?: string;
+    more?: string;
   };
+};
 
-  // Render weeks
-  const renderWeeks = () => {
-    const weeksArray = [];
-    let currentWeekStart = startOfWeek(startDate, { weekStartsOn: 0 });
+type MonthLabel = {
+  weekIndex: number;
+  label: string;
+};
 
-    for (let i = 0; i < weeks; i++) {
-      const weekDays = eachDayOfInterval({
-        start: currentWeekStart,
-        end: endOfWeek(currentWeekStart, { weekStartsOn: 0 }),
-      });
+const DEFAULT_MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
-      weeksArray.push(
-        <div key={i} className="flex flex-col gap-1">
-          {weekDays.map((day, index) => {
-            const contribution = contributions.find((c) => isSameDay(new Date(c.date), day));
-            const color = contribution ? getColor(contribution.count) : colors[0];
+const DEFAULT_LABELS: Labels = {
+  months: DEFAULT_MONTH_LABELS,
+  weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  totalCount: "{{count}} activities in {{year}}",
+  legend: {
+    less: "Less",
+    more: "More",
+  },
+};
 
-            return (
-              <div
-                key={index}
-                className={`w-3 h-3 rounded-[4px]`}
-                style={{ backgroundColor: color }}
-                title={`${format(day, "PPP")}: ${contribution?.count || 0} contributions`}
-              />
-            );
-          })}
-        </div>
-      );
-      currentWeekStart = addDays(currentWeekStart, 7);
+type ContributionGraphContextType = {
+  data: Activity[];
+  weeks: Week[];
+  blockMargin: number;
+  blockRadius: number;
+  blockSize: number;
+  fontSize: number;
+  labels: Labels;
+  labelHeight: number;
+  maxLevel: number;
+  totalCount: number;
+  weekStart: WeekDay;
+  year: number;
+  width: number;
+  height: number;
+};
+
+const ContributionGraphContext =
+  createContext<ContributionGraphContextType | null>(null);
+
+const useContributionGraph = () => {
+  const context = useContext(ContributionGraphContext);
+
+  if (!context) {
+    throw new Error(
+      "ContributionGraph components must be used within a ContributionGraph"
+    );
+  }
+
+  return context;
+};
+
+const fillHoles = (activities: Activity[]): Activity[] => {
+  if (activities.length === 0) {
+    return [];
+  }
+
+  // Sort activities by date to ensure correct date range
+  const sortedActivities = [...activities].sort((a, b) =>
+    a.date.localeCompare(b.date)
+  );
+
+  const calendar = new Map<string, Activity>(
+    activities.map((a) => [a.date, a])
+  );
+
+  const firstActivity = sortedActivities[0] as Activity;
+  const lastActivity = sortedActivities.at(-1);
+
+  if (!lastActivity) {
+    return [];
+  }
+
+  return eachDayOfInterval({
+    start: parseISO(firstActivity.date),
+    end: parseISO(lastActivity.date),
+  }).map((day) => {
+    const date = formatISO(day, { representation: "date" });
+
+    if (calendar.has(date)) {
+      return calendar.get(date) as Activity;
     }
 
-    return weeksArray;
-  };
+    return {
+      date,
+      count: 0,
+      level: 0,
+    };
+  });
+};
 
-  // Render month labels dynamically based on the actual calendar weeks
-  const renderMonthLabels = () => {
-    const monthLabels: Array<{ label: string; weekIndex: number }> = [];
-    const calendarStart = startOfWeek(startDate, { weekStartsOn: 0 });
-    let currentWeekStart = calendarStart;
-    
-    // Track which months we've already labeled
-    const seenMonths = new Set<string>();
-    
-    // Iterate through all weeks to find where months start
-    for (let weekIndex = 0; weekIndex < weeks; weekIndex++) {
-      const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
-      
-      // Check each day of the week to see if it's the first day of a month
-      const weekDays = eachDayOfInterval({
-        start: currentWeekStart,
-        end: weekEnd,
-      });
-      
-      for (const day of weekDays) {
-        // Check if this is the first day of a month
-        if (isSameDay(day, startOfMonth(day))) {
-          const monthKey = `${getYear(day)}-${getMonth(day)}`;
-          
-          // Only add label if we haven't seen this month yet
-          if (!seenMonths.has(monthKey) && 
-              (isAfter(day, startDate) || isSameDay(day, startDate)) &&
-              (isBefore(day, today) || isSameDay(day, today))) {
-            monthLabels.push({
-              label: format(day, "MMM"),
-              weekIndex: weekIndex,
-            });
-            seenMonths.add(monthKey);
-            break; // Only one label per week
-          }
-        }
-      }
-      
-      // Always ensure current month is shown on the last week if not already added
-      if (weekIndex === weeks - 1) {
-        const currentMonthKey = `${getYear(today)}-${getMonth(today)}`;
-        if (!seenMonths.has(currentMonthKey)) {
-          monthLabels.push({
-            label: format(today, "MMM"),
-            weekIndex: weekIndex,
-          });
-          seenMonths.add(currentMonthKey);
-        }
-      }
-      
-      currentWeekStart = addDays(currentWeekStart, 7);
-    }
-    
-    // Sort by week index
-    monthLabels.sort((a, b) => a.weekIndex - b.weekIndex);
-    
-    // Render labels positioned at their respective week indices
-    // Each label should align with its corresponding week column
-    // Week columns are w-3 (0.75rem) wide, with gap-1 (0.25rem) between them
-    const labelElements = [];
-    let currentLabelIndex = 0;
-    
-    for (let i = 0; i < weeks; i++) {
-      if (currentLabelIndex < monthLabels.length && monthLabels[currentLabelIndex].weekIndex === i) {
-        // Render the month label - align left within the week column width
-        labelElements.push(
-          <div key={i} className="text-xs text-gray-500 w-3 flex items-start">
-            {monthLabels[currentLabelIndex].label}
-          </div>
+const groupByWeeks = (
+  activities: Activity[],
+  weekStart: WeekDay = 0
+): Week[] => {
+  if (activities.length === 0) {
+    return [];
+  }
+
+  const normalizedActivities = fillHoles(activities);
+  const firstActivity = normalizedActivities[0] as Activity;
+  const firstDate = parseISO(firstActivity.date);
+  const firstCalendarDate =
+    getDay(firstDate) === weekStart
+      ? firstDate
+      : subWeeks(nextDay(firstDate, weekStart), 1);
+
+  const paddedActivities = [
+    ...(new Array(differenceInCalendarDays(firstDate, firstCalendarDate)).fill(
+      undefined
+    ) as Activity[]),
+    ...normalizedActivities,
+  ];
+
+  const numberOfWeeks = Math.ceil(paddedActivities.length / 7);
+
+  return new Array(numberOfWeeks)
+    .fill(undefined)
+    .map((_, weekIndex) =>
+      paddedActivities.slice(weekIndex * 7, weekIndex * 7 + 7)
+    );
+};
+
+const getMonthLabels = (
+  weeks: Week[],
+  monthNames: string[] = DEFAULT_MONTH_LABELS
+): MonthLabel[] => {
+  return weeks
+    .reduce<MonthLabel[]>((labels, week, weekIndex) => {
+      const firstActivity = week.find((activity) => activity !== undefined);
+
+      if (!firstActivity) {
+        throw new Error(
+          `Unexpected error: Week ${weekIndex + 1} is empty: [${week}].`
         );
-        currentLabelIndex++;
-      } else {
-        // Add empty placeholder with same width as week column
-        labelElements.push(
-          <div key={i} className="w-3"></div>
+      }
+
+      const month = monthNames[getMonth(parseISO(firstActivity.date))];
+
+      if (!month) {
+        const monthName = new Date(firstActivity.date).toLocaleString("en-US", {
+          month: "short",
+        });
+        throw new Error(
+          `Unexpected error: undefined month label for ${monthName}.`
         );
       }
-    }
-    
-    return labelElements;
-  };
 
-  // Render day labels
-  const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const prevLabel = labels.at(-1);
+
+      if (weekIndex === 0 || !prevLabel || prevLabel.label !== month) {
+        return labels.concat({ weekIndex, label: month });
+      }
+
+      return labels;
+    }, [])
+    .filter(({ weekIndex }, index, labels) => {
+      const minWeeks = 3;
+
+      if (index === 0) {
+        return labels[1] && labels[1].weekIndex - weekIndex >= minWeeks;
+      }
+
+      if (index === labels.length - 1) {
+        return weeks.slice(weekIndex).length >= minWeeks;
+      }
+
+      return true;
+    });
+};
+
+export type ContributionGraphProps = HTMLAttributes<HTMLDivElement> & {
+  data: Activity[];
+  blockMargin?: number;
+  blockRadius?: number;
+  blockSize?: number;
+  fontSize?: number;
+  labels?: Labels;
+  maxLevel?: number;
+  style?: CSSProperties;
+  totalCount?: number;
+  weekStart?: WeekDay;
+  children: ReactNode;
+  className?: string;
+};
+
+export const ContributionGraph = ({
+  data,
+  blockMargin = 4,
+  blockRadius = 2,
+  blockSize = 12,
+  fontSize = 14,
+  labels: labelsProp = undefined,
+  maxLevel: maxLevelProp = 4,
+  style = {},
+  totalCount: totalCountProp = undefined,
+  weekStart = 0,
+  className,
+  ...props
+}: ContributionGraphProps) => {
+  const maxLevel = Math.max(1, maxLevelProp);
+  const weeks = useMemo(() => groupByWeeks(data, weekStart), [data, weekStart]);
+  const LABEL_MARGIN = 8;
+
+  const labels = { ...DEFAULT_LABELS, ...labelsProp };
+  const labelHeight = fontSize + LABEL_MARGIN;
+
+  const year =
+    data.length > 0
+      ? getYear(parseISO(data[0].date))
+      : new Date().getFullYear();
+
+  const totalCount =
+    typeof totalCountProp === "number"
+      ? totalCountProp
+      : data.reduce((sum, activity) => sum + activity.count, 0);
+
+  const width = weeks.length * (blockSize + blockMargin) - blockMargin;
+  const height = labelHeight + (blockSize + blockMargin) * 7 - blockMargin;
+
+  if (data.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="p-4 border rounded-lg max-w-2xl overflow-x-auto ">
-      <div className="flex">
-        <div className="flex flex-col justify-between mt-5.5 mr-2">
-          {dayLabels.map((day, index) => (
-            <span key={index} className="text-xs text-gray-500 h-3">
-              {day}
-            </span>
-          ))}
-        </div>
-        <div className="pr-2">
-          <div className="flex gap-1 mb-2 ">{renderMonthLabels()}</div>
-          <div className="flex gap-1 ">{renderWeeks()}</div>
-        </div>
-      </div>
-      <div className="mt-4 justify-start flex gap-2 text-xs items-center">
-        <span>Less</span>
-        {colors.map((color, index) => (
-          <div key={index} className="w-3 h-3 rounded-[4px]" style={{ backgroundColor: color }} />
-        ))}
-        <span>More</span>
-      </div>
+    <ContributionGraphContext.Provider
+      value={{
+        data,
+        weeks,
+        blockMargin,
+        blockRadius,
+        blockSize,
+        fontSize,
+        labels,
+        labelHeight,
+        maxLevel,
+        totalCount,
+        weekStart,
+        year,
+        width,
+        height,
+      }}
+    >
+      <div
+        className={cn("flex w-max max-w-full flex-col gap-2", className)}
+        style={{ fontSize, ...style }}
+        {...props}
+      />
+    </ContributionGraphContext.Provider>
+  );
+};
+
+export type ContributionGraphBlockProps = HTMLAttributes<SVGRectElement> & {
+  activity: Activity;
+  dayIndex: number;
+  weekIndex: number;
+};
+
+export const ContributionGraphBlock = ({
+  activity,
+  dayIndex,
+  weekIndex,
+  className,
+  ...props
+}: ContributionGraphBlockProps) => {
+  const { blockSize, blockMargin, blockRadius, labelHeight, maxLevel } =
+    useContributionGraph();
+
+  if (activity.level < 0 || activity.level > maxLevel) {
+    throw new RangeError(
+      `Provided activity level ${activity.level} for ${activity.date} is out of range. It must be between 0 and ${maxLevel}.`
+    );
+  }
+
+  return (
+    <rect
+      className={cn(
+        'data-[level="0"]:fill-muted',
+        'data-[level="1"]:fill-muted-foreground/20',
+        'data-[level="2"]:fill-muted-foreground/40',
+        'data-[level="3"]:fill-muted-foreground/60',
+        'data-[level="4"]:fill-muted-foreground/80',
+        className
+      )}
+      data-count={activity.count}
+      data-date={activity.date}
+      data-level={activity.level}
+      height={blockSize}
+      rx={blockRadius}
+      ry={blockRadius}
+      width={blockSize}
+      x={(blockSize + blockMargin) * weekIndex}
+      y={labelHeight + (blockSize + blockMargin) * dayIndex}
+      {...props}
+    />
+  );
+};
+
+export type ContributionGraphCalendarProps = Omit<
+  HTMLAttributes<HTMLDivElement>,
+  "children"
+> & {
+  hideMonthLabels?: boolean;
+  className?: string;
+  children: (props: {
+    activity: Activity;
+    dayIndex: number;
+    weekIndex: number;
+  }) => ReactNode;
+};
+
+export const ContributionGraphCalendar = ({
+  hideMonthLabels = false,
+  className,
+  children,
+  ...props
+}: ContributionGraphCalendarProps) => {
+  const { weeks, width, height, blockSize, blockMargin, labels } =
+    useContributionGraph();
+
+  const monthLabels = useMemo(
+    () => getMonthLabels(weeks, labels.months),
+    [weeks, labels.months]
+  );
+
+  return (
+    <div
+      className={cn("max-w-full overflow-x-auto overflow-y-hidden", className)}
+      {...props}
+    >
+      <svg
+        className="block overflow-visible"
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        width={width}
+      >
+        <title>Contribution Graph</title>
+        {!hideMonthLabels && (
+          <g className="fill-current">
+            {monthLabels.map(({ label, weekIndex }) => (
+              <text
+                dominantBaseline="hanging"
+                key={weekIndex}
+                x={(blockSize + blockMargin) * weekIndex}
+              >
+                {label}
+              </text>
+            ))}
+          </g>
+        )}
+        {weeks.map((week, weekIndex) =>
+          week.map((activity, dayIndex) => {
+            if (!activity) {
+              return null;
+            }
+
+            return (
+              <Fragment key={`${weekIndex}-${dayIndex}`}>
+                {children({ activity, dayIndex, weekIndex })}
+              </Fragment>
+            );
+          })
+        )}
+      </svg>
     </div>
   );
 };
 
-export {GitHubCalendar};
+export type ContributionGraphFooterProps = HTMLAttributes<HTMLDivElement>;
+
+export const ContributionGraphFooter = ({
+  className,
+  ...props
+}: ContributionGraphFooterProps) => (
+  <div
+    className={cn(
+      "flex flex-wrap gap-1 whitespace-nowrap sm:gap-x-4",
+      className
+    )}
+    {...props}
+  />
+);
+
+export type ContributionGraphTotalCountProps = Omit<
+  HTMLAttributes<HTMLDivElement>,
+  "children"
+> & {
+  children?: (props: { totalCount: number; year: number }) => ReactNode;
+};
+
+export const ContributionGraphTotalCount = ({
+  className,
+  children,
+  ...props
+}: ContributionGraphTotalCountProps) => {
+  const { totalCount, year, labels } = useContributionGraph();
+
+  if (children) {
+    return <>{children({ totalCount, year })}</>;
+  }
+
+  return (
+    <div className={cn("text-muted-foreground", className)} {...props}>
+      {labels.totalCount
+        ? labels.totalCount
+            .replace("{{count}}", String(totalCount))
+            .replace("{{year}}", String(year))
+        : `${totalCount} activities in ${year}`}
+    </div>
+  );
+};
+
+export type ContributionGraphLegendProps = Omit<
+  HTMLAttributes<HTMLDivElement>,
+  "children"
+> & {
+  children?: (props: { level: number }) => ReactNode;
+};
+
+export const ContributionGraphLegend = ({
+  className,
+  children,
+  ...props
+}: ContributionGraphLegendProps) => {
+  const { labels, maxLevel, blockSize, blockRadius } = useContributionGraph();
+
+  return (
+    <div
+      className={cn("ml-auto flex items-center gap-[3px]", className)}
+      {...props}
+    >
+      <span className="mr-1 text-muted-foreground">
+        {labels.legend?.less || "Less"}
+      </span>
+      {new Array(maxLevel + 1).fill(undefined).map((_, level) =>
+        children ? (
+          <Fragment key={level}>{children({ level })}</Fragment>
+        ) : (
+          <svg height={blockSize} key={level} width={blockSize}>
+            <title>{`${level} contributions`}</title>
+            <rect
+              className={cn(
+                "stroke-[1px] stroke-border",
+                'data-[level="0"]:fill-muted',
+                'data-[level="1"]:fill-muted-foreground/20',
+                'data-[level="2"]:fill-muted-foreground/40',
+                'data-[level="3"]:fill-muted-foreground/60',
+                'data-[level="4"]:fill-muted-foreground/80'
+              )}
+              data-level={level}
+              height={blockSize}
+              rx={blockRadius}
+              ry={blockRadius}
+              width={blockSize}
+            />
+          </svg>
+        )
+      )}
+      <span className="ml-1 text-muted-foreground">
+        {labels.legend?.more || "More"}
+      </span>
+    </div>
+  );
+};
