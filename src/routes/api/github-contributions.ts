@@ -1,151 +1,75 @@
-import { createFileRoute } from '@tanstack/react-router';
-
-interface ContributionDay {
-  date: string; // ISO date string
-  count: number;
-}
+import { createFileRoute } from "@tanstack/react-router";
 
 interface GitHubContributionsResponse {
-  data?: {
-    user?: {
-      contributionsCollection?: {
-        contributionCalendar?: {
-          weeks?: Array<{
-            contributionDays?: Array<{
-              date: string;
-              contributionCount: number;
-            }>;
-          }>;
-        };
-      };
-    };
-  };
-  errors?: Array<{
-    message: string;
-    type: string;
+  contributions: Array<{
+    date: string;
+    count: number;
+    level: number;
   }>;
+  total: {
+    [year: string]: number;
+  };
 }
 
-export const Route = createFileRoute('/api/github-contributions')({
+export const Route = createFileRoute("/api/github-contributions")({
   server: {
     handlers: {
       GET: async ({ request }) => {
         try {
           const url = new URL(request.url);
-          const username = url.searchParams.get('username') || process.env.GITHUB_USERNAME;
-          const token = process.env.GITHUB_TOKEN;
+          const username =
+            url.searchParams.get("username") ||
+            process.env.GITHUB_USERNAME ||
+            "haydenbleasel";
 
-          if (!username) {
-            return Response.json(
-              { error: 'GitHub username is required. Provide it as a query parameter or set GITHUB_USERNAME environment variable.' },
-              { status: 400 }
-            );
-          }
+          const apiUrl = new URL(
+            `/v4/${username}`,
+            "https://github-contributions-api.jogruber.de"
+          );
 
-          // Calculate date range for the last year (exactly 365 days)
-          const now = new Date();
-          const oneYearAgo = new Date(now);
-          oneYearAgo.setDate(oneYearAgo.getDate() - 365);
-          const from = oneYearAgo.toISOString();
-          const to = now.toISOString();
-
-          // GraphQL query to fetch contributions
-          const query = `
-            query($username: String!, $from: DateTime!, $to: DateTime!) {
-              user(login: $username) {
-                contributionsCollection(from: $from, to: $to) {
-                  contributionCalendar {
-                    weeks {
-                      contributionDays {
-                        date
-                        contributionCount
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          `;
-
-          // Prepare request headers
-          const headers: HeadersInit = {
-            'Content-Type': 'application/json',
-          };
-
-          // Add authorization header if token is provided
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-
-          // Fetch data from GitHub GraphQL API
-          const response = await fetch('https://api.github.com/graphql', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              query,
-              variables: {
-                username,
-                from,
-                to,
-              },
-            }),
-          });
+          const response = await fetch(apiUrl.toString());
 
           if (!response.ok) {
-            const errorText = await response.text();
             return Response.json(
-              { error: `GitHub API error: ${response.status} ${response.statusText}`, details: errorText },
+              {
+                error: `GitHub contributions API error: ${response.status} ${response.statusText}`,
+              },
               { status: response.status }
             );
           }
 
-          const result: GitHubContributionsResponse = await response.json();
+          const data = (await response.json()) as GitHubContributionsResponse;
 
-          // Handle GraphQL errors
-          if (result.errors) {
-            return Response.json(
-              { error: 'GitHub API error', details: result.errors.map((e) => e.message).join(', ') },
-              { status: 400 }
-            );
-          }
+          // Calculate date 365 days ago and today
+          const now = new Date();
+          const oneYearAgo = new Date(now);
+          oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+          const oneYearAgoISO = oneYearAgo.toISOString().split("T")[0]; // YYYY-MM-DD format
+          const todayISO = now.toISOString().split("T")[0]; // YYYY-MM-DD format
 
-          // Handle user not found
-          if (!result.data?.user) {
-            return Response.json(
-              { error: `User "${username}" not found on GitHub` },
-              { status: 404 }
-            );
-          }
+          // Filter contributions to only include the last year up to today
+          const lastYearContributions = data.contributions.filter((contribution) => {
+            return contribution.date >= oneYearAgoISO && contribution.date <= todayISO;
+          });
 
-          // Transform the response to ContributionDay format and filter to only last year
-          const contributions: ContributionDay[] = [];
-          const weeks = result.data.user.contributionsCollection?.contributionCalendar?.weeks || [];
+          // Calculate total for the last year
+          const total = lastYearContributions.reduce(
+            (sum, contribution) => sum + contribution.count,
+            0
+          );
 
-          // Calculate the exact one year ago date (365 days)
-          const oneYearAgoTimestamp = oneYearAgo.getTime();
-          const nowTimestamp = now.getTime();
-
-          for (const week of weeks) {
-            const days = week.contributionDays || [];
-            for (const day of days) {
-              const dayDate = new Date(day.date);
-              const dayTimestamp = dayDate.getTime();
-
-              // Only include contributions from the last year (within the date range)
-              if (dayTimestamp >= oneYearAgoTimestamp && dayTimestamp <= nowTimestamp) {
-                contributions.push({
-                  date: day.date,
-                  count: day.contributionCount,
-                });
-              }
-            }
-          }
-
-          return Response.json(contributions);
+          return Response.json({
+            contributions: lastYearContributions,
+            total,
+          });
         } catch (error) {
-          console.error('Error fetching GitHub contributions:', error);
+          console.error("Error fetching GitHub contributions:", error);
           return Response.json(
-            { error: 'Failed to fetch GitHub contributions', details: error instanceof Error ? error.message : 'Unknown error' },
+            {
+              error: "Failed to fetch GitHub contributions",
+              details:
+                error instanceof Error ? error.message : "Unknown error",
+            },
             { status: 500 }
           );
         }
