@@ -14,19 +14,19 @@ export function Hero() {
                 </div>
             </div>
             <div className="flex flex-row gap-3 max-w-2xl">
-                <Card className="flex flex-col  justify-center h-16 flex-1 cursor-pointer hover:bg-secondary transition-colors bg-muted/50" >
+                <Card className="flex flex-col  justify-center h-16 flex-1 cursor-pointer hover:bg-secondary transition-colors " >
                     <CardContent className="flex flex-col gap-1 justify-center p-4">
                         <HugeiconsIcon icon={ChatIcon} className="size-4" />
                         <span className="text-xs ">Chat with AI</span>
                     </CardContent>
                 </Card>
-                <Card className="flex flex-col  justify-center h-16 flex-1 cursor-pointer hover:bg-secondary transition-colors bg-muted/50">
+                <Card className="flex flex-col  justify-center h-16 flex-1 cursor-pointer hover:bg-secondary transition-colors ">
                     <CardContent className="flex flex-col gap-1 justify-center p-4">
                         <HugeiconsIcon icon={MailIcon} className="size-4" />
                         <span className="text-xs ">Contact Me</span>
                     </CardContent>
                 </Card>
-                <Card className="flex flex-col  justify-center h-16 flex-1 cursor-pointer hover:bg-secondary transition-colors bg-muted/50">
+                <Card className="flex flex-col  justify-center h-16 flex-1 cursor-pointer hover:bg-secondary transition-colors ">
                     <CardContent className="flex flex-col gap-1 justify-center p-4">
                         <HugeiconsIcon icon={File01Icon} className="size-4" />
                         <span className="text-xs ">View Resume</span>

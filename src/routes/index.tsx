@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Hero } from "@/components/Hero";
 import { RecentBlogPosts } from "@/components/RecentBlogPosts";
 import { GithubGraph } from "@/components/GithubGraph";
+import Projects from "@/components/Projects";
 
 export const Route = createFileRoute("/")({ component: App });
 
@@ -11,6 +12,7 @@ return (
     <Hero />
     <RecentBlogPosts />
     <GithubGraph />
+    <Projects />
   </div>
 );
 }
