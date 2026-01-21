@@ -3,6 +3,7 @@ import { Hero } from "@/components/Hero";
 import { RecentBlogPosts } from "@/components/RecentBlogPosts";
 import { GithubGraph } from "@/components/GithubGraph";
 import Projects from "@/components/Projects";
+import { Skills } from "@/components/Skills";
 
 export const Route = createFileRoute("/")({ component: App });
 
@@ -13,6 +14,7 @@ return (
     <RecentBlogPosts />
     <GithubGraph />
     <Projects />
+    <Skills />
   </div>
 );
 }
