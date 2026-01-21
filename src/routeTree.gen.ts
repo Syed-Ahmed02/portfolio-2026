@@ -9,11 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PostsRouteImport } from './routes/posts'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PostsPostIdRouteImport } from './routes/posts/$postId'
 import { Route as ApiGithubContributionsRouteImport } from './routes/api/github-contributions'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
+const PostsRoute = PostsRouteImport.update({
+  id: '/posts',
+  path: '/posts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -23,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PostsPostIdRoute = PostsPostIdRouteImport.update({
+  id: '/$postId',
+  path: '/$postId',
+  getParentRoute: () => PostsRoute,
 } as any)
 const ApiGithubContributionsRoute = ApiGithubContributionsRouteImport.update({
   id: '/api/github-contributions',
@@ -38,39 +50,72 @@ const ApiChatRoute = ApiChatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
+  '/posts': typeof PostsRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/api/github-contributions': typeof ApiGithubContributionsRoute
+  '/posts/$postId': typeof PostsPostIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
+  '/posts': typeof PostsRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/api/github-contributions': typeof ApiGithubContributionsRoute
+  '/posts/$postId': typeof PostsPostIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
+  '/posts': typeof PostsRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/api/github-contributions': typeof ApiGithubContributionsRoute
+  '/posts/$postId': typeof PostsPostIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/chat' | '/api/chat' | '/api/github-contributions'
+  fullPaths:
+    | '/'
+    | '/chat'
+    | '/posts'
+    | '/api/chat'
+    | '/api/github-contributions'
+    | '/posts/$postId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chat' | '/api/chat' | '/api/github-contributions'
-  id: '__root__' | '/' | '/chat' | '/api/chat' | '/api/github-contributions'
+  to:
+    | '/'
+    | '/chat'
+    | '/posts'
+    | '/api/chat'
+    | '/api/github-contributions'
+    | '/posts/$postId'
+  id:
+    | '__root__'
+    | '/'
+    | '/chat'
+    | '/posts'
+    | '/api/chat'
+    | '/api/github-contributions'
+    | '/posts/$postId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChatRoute: typeof ChatRoute
+  PostsRoute: typeof PostsRouteWithChildren
   ApiChatRoute: typeof ApiChatRoute
   ApiGithubContributionsRoute: typeof ApiGithubContributionsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/posts': {
+      id: '/posts'
+      path: '/posts'
+      fullPath: '/posts'
+      preLoaderRoute: typeof PostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/chat': {
       id: '/chat'
       path: '/chat'
@@ -84,6 +129,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/posts/$postId': {
+      id: '/posts/$postId'
+      path: '/$postId'
+      fullPath: '/posts/$postId'
+      preLoaderRoute: typeof PostsPostIdRouteImport
+      parentRoute: typeof PostsRoute
     }
     '/api/github-contributions': {
       id: '/api/github-contributions'
@@ -102,9 +154,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface PostsRouteChildren {
+  PostsPostIdRoute: typeof PostsPostIdRoute
+}
+
+const PostsRouteChildren: PostsRouteChildren = {
+  PostsPostIdRoute: PostsPostIdRoute,
+}
+
+const PostsRouteWithChildren = PostsRoute._addFileChildren(PostsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChatRoute: ChatRoute,
+  PostsRoute: PostsRouteWithChildren,
   ApiChatRoute: ApiChatRoute,
   ApiGithubContributionsRoute: ApiGithubContributionsRoute,
 }

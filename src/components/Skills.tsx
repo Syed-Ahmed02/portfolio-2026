@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import {
   Atom,
   Braces,
@@ -8,12 +7,14 @@ import {
   Server,
 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
+
 type Skill = {
   label: string;
   Icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
 
-const skills: Skill[] = [
+const skills: Array<Skill> = [
   { label: "React", Icon: Atom },
   { label: "Next.js", Icon: Code },
   { label: "TypeScript", Icon: Braces },

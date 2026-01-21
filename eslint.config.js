@@ -2,4 +2,11 @@
 
 import { tanstackConfig } from '@tanstack/eslint-config'
 
-export default [...tanstackConfig]
+export default [
+    {
+        files: ['src/**/*.ts', 'src/**/*.tsx'],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'off',
+        },
+    },
+    ...tanstackConfig]

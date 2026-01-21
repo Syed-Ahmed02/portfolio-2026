@@ -1,6 +1,6 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { ChatIcon, MailIcon, File01Icon } from "@hugeicons/core-free-icons";
+import { ChatIcon, File01Icon, MailIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react"
+import { Card, CardContent } from "@/components/ui/card";
 export function Hero() {
     return (
         <div className=" space-y-6">

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StripedPattern } from "@/components/ui/striped-pattern";
+import { GlowingEffect } from "@/components/ui/glowing-effect";
 
 const projects = [
   {
@@ -32,10 +32,13 @@ const projects = [
 export default function Projects() {
   return (
     <div className="max-w-2xl grid grid-cols-2 gap-4 space-y-6">
+
       {projects.map((project) => (
-        <Card key={project.title} className="hover:bg-secondary bg-card shadow-2xl transition-colors w-full overflow-hidden">
-          <div className="aspect-video w-full overflow-hidden">
-            <img 
+
+        <Card key={project.title} className="relative hover:bg-secondary bg-card shadow-2xl transition-colors w-full overflow-hidden">
+
+          <div className="aspect-video w-full overflow-hidden rounded-lg">
+            <img
               src={`https://picsum.photos/seed/${project.title}/400/300`}
               alt={project.title}
               className="w-full h-full object-cover px-4"
