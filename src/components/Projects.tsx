@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { GlowingEffect } from "@/components/ui/glowing-effect";
+
 
 const projects = [
   {
