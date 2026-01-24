@@ -1,65 +1,90 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { format } from 'date-fns';
+import { createFileRoute, notFound } from '@tanstack/react-router';
 import { BlogPost } from '@/components/BlogPost';
+import { getPostBySlug } from '@/lib/api';
+import type { Author } from '@/components/circular-testimonials';
 
 export const Route = createFileRoute('/posts/$postId')({
+  loader: ({ params }) => {
+    const post = getPostBySlug(params.postId);
+
+    if (!post) {
+      throw notFound();
+    }
+
+    return { post };
+  },
+  head: ({ loaderData }) => {
+    if (!loaderData) {
+      return {};
+    }
+
+    const { post } = loaderData;
+    const title = `${post.title} | Blog`;
+    const authorName = typeof post.author === 'object' && post.author !== null
+      ? post.author.name
+      : post.author || '';
+
+    return {
+      meta: [
+        {
+          title,
+        },
+        {
+          name: 'description',
+          content: post.excerpt || post.title,
+        },
+        {
+          property: 'og:title',
+          content: title,
+        },
+        {
+          property: 'og:description',
+          content: post.excerpt || post.title,
+        },
+        {
+          property: 'og:image',
+          content: post.ogImage?.url || post.coverImage || '',
+        },
+        {
+          property: 'og:type',
+          content: 'article',
+        },
+        {
+          property: 'article:published_time',
+          content: post.date,
+        },
+        {
+          property: 'article:author',
+          content: authorName,
+        },
+      ],
+    };
+  },
   component: RouteComponent,
 })
 
 function RouteComponent() {
-  const { postId } = Route.useParams();
-  
-  // Example markdown content - replace this with your actual markdown loading logic
-  const sampleMarkdown = `# Welcome to My Blog Post
+  const { post } = Route.useLoaderData();
 
-This is a sample blog post demonstrating markdown rendering.
+  // Format the date for display
+  const formattedDate = post.date
+    ? format(new Date(post.date), 'MMMM d, yyyy')
+    : undefined;
 
-## Features
+  // Format author name - handle both object and string types
+  const authorName = typeof post.author === 'object'
+    ? post.author.name
+    : (post.author as string | undefined);
 
-- **Bold text** and *italic text*
-- Code blocks with syntax highlighting
-- Lists and more!
-
-## Code Example
-
-Here's a code example:
-
-\`\`\`typescript
-function greet(name: string) {
-  return \`Hello, \${name}!\`;
-}
-
-console.log(greet("World"));
-\`\`\`
-
-## More Content
-
-You can add:
-
-- Bullet points
-- Numbered lists
-- [Links](https://example.com)
-- Images
-- And much more!
-
-> This is a blockquote example.
-
-\`\`\`javascript
-const data = {
-  name: "Blog Post",
-  date: "2024-01-15"
-};
-\`\`\`
-`;
-  
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-4xl mx-auto px-4 py-8">
-      
-        <BlogPost 
-          content={sampleMarkdown}
-          title="Sample Blog Post"
-          date="January 15, 2024"
-          author="Your Name"
+        <BlogPost
+          content={post.content}
+          title={post.title}
+          date={formattedDate}
+          author={authorName}
         />
       </div>
     </div>

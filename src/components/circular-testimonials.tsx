@@ -3,18 +3,29 @@ import React, {
   useEffect,
   useRef,
   useState,
-  useMemo,
   useCallback,
+  useMemo,
 } from "react";
 import { FaArrowLeft, FaArrowRight } from "react-icons/fa";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "./ui/button";
 
+export type Author = {
+  name: string;
+  picture: string;
+};
 export interface BlogPost {
-  content: string;
+  slug: string;
   title: string;
   date: string;
-  image: string;
+  coverImage: string;
+  author: Author;
+  excerpt: string;
+  ogImage: {
+    url: string;
+  };
+  content: string;
+  preview?: boolean;
 }
 interface Colors {
   title?: string;
