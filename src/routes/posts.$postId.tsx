@@ -1,8 +1,8 @@
 import { format } from 'date-fns';
 import { createFileRoute, notFound } from '@tanstack/react-router';
-import { BlogPost } from '@/components/BlogPost';
-import { getPostBySlug } from '@/lib/api';
 import type { Author } from '@/components/circular-testimonials';
+import { getPostBySlug } from '@/lib/api';
+import { BlogPost } from '@/components/BlogPost';
 
 export const Route = createFileRoute('/posts/$postId')({
   loader: ({ params }) => {
@@ -21,9 +21,7 @@ export const Route = createFileRoute('/posts/$postId')({
 
     const { post } = loaderData;
     const title = `${post.title} | Blog`;
-    const authorName = typeof post.author === 'object' && post.author !== null
-      ? post.author.name
-      : post.author || '';
+    const authorName = post.author.name;
 
     return {
       meta: [
@@ -44,7 +42,7 @@ export const Route = createFileRoute('/posts/$postId')({
         },
         {
           property: 'og:image',
-          content: post.ogImage?.url || post.coverImage || '',
+          content: post.ogImage.url || post.coverImage || '',
         },
         {
           property: 'og:type',
