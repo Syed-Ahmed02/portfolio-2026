@@ -12,9 +12,9 @@ function App() {
   return (
     <div className=" h-screen bg-background flex flex-col space-y-6  mx-auto px-4 py-8 max-w-2xl">
       <Hero />
+      <RecentBlogPosts />
       <GithubGraph />
       <Projects />
-      <RecentBlogPosts />
       <Skills />
     </div>
   );
